@@ -1,0 +1,13 @@
+{
+  "cooldown_seconds": 5,
+  "debounce_seconds": 0.05,
+  "timezone": "Europe/London",
+  "audio_device": "plughw:CARD=Headphones,DEV=0",
+  "buttons": [
+    {"id": "button_1", "label": "⚡ I'm alive", "emotion": "Energetic", "gpio": 17},
+    {"id": "button_2", "label": "😴 I'm dead", "emotion": "Exhausted", "gpio": 27},
+    {"id": "button_3", "label": "📺 I'm watching TV", "emotion": "Chilling / zoning out", "gpio": 22},
+    {"id": "button_4", "label": "👀 I'm watching you", "emotion": "Anxious / on edge", "gpio": 23},
+    {"id": "button_5", "label": "😠 Fuck you", "emotion": "Angry", "gpio": 24}
+  ]
+}

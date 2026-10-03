@@ -1,0 +1,9 @@
+[Unit]
+Description=Sync Mood Switch responses to Google Sheets
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/TheMoodSwicth
+ExecStart=%h/TheMoodSwicth/.venv-sync/bin/python -m moodswitch.sync
+UMask=0077
+TimeoutStartSec=300

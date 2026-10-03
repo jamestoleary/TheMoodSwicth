@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Mood Switch</title>
+<style>
+:root{color-scheme:light;--ink:#173b36;--muted:#64746f;--line:#dce6df;--green:#256c57}
+*{box-sizing:border-box}body{margin:0;background:#f4f6f0;color:var(--ink);font:16px system-ui,sans-serif}
+main{max-width:1120px;margin:0 auto;padding:40px 24px}header{display:flex;justify-content:space-between;align-items:center;gap:20px}
+.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:2px;font-weight:700;color:var(--green)}h1{font-size:clamp(30px,5vw,48px);letter-spacing:-2px;margin:8px 0}p{color:var(--muted);line-height:1.5}
+.status{border-radius:30px;padding:10px 16px;background:#e2efe4;font-size:13px;white-space:nowrap}.offline{background:#fbe1dc;color:#a03928}
+.live{margin:28px 0;background:var(--ink);color:white;border-radius:20px;padding:24px;display:flex;justify-content:space-between;gap:20px;align-items:center}.live p{color:#c7d9d0;margin:7px 0 0}.live strong{font-size:22px}.cooldown{text-align:right;font-size:14px}
+.buttons{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}.button-card{padding:24px 14px;background:white;border:2px solid transparent;border-radius:18px;text-align:center;transition:background .15s,border-color .15s,transform .15s}
+.dot{height:46px;width:46px;border-radius:50%;background:#edf1e9;margin:0 auto 14px;box-shadow:inset 0 0 0 8px #f8faf5}.button-card.active{background:#d6efdc;border-color:#318961;transform:translateY(-3px)}.active .dot{background:#36885e;box-shadow:0 0 0 8px #bde5c8}.button-card strong{display:block}.button-card small{display:block;margin-top:8px;color:var(--muted)}.button-card .meaning{font-size:12px;line-height:1.4;color:var(--muted);margin-top:8px}
+.totals{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:28px 0}.total{background:white;border-radius:18px;padding:22px}.total span{color:var(--muted);font-size:14px}.total strong{display:block;font-size:42px;margin-top:8px;font-variant-numeric:tabular-nums}
+.panel{background:white;border-radius:18px;padding:24px;margin-top:20px}h2{font-size:20px;margin:0 0 18px}table{border-collapse:collapse;width:100%;text-align:left}th{font-size:12px;color:var(--muted);font-weight:600}td,th{padding:14px 10px;border-bottom:1px solid var(--line)}td:not(:first-child),th:not(:first-child){text-align:right}tbody tr:last-child td{border-bottom:0}.recent{list-style:none;margin:0;padding:0}.recent li{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--line);gap:16px}.recent li:last-child{border:0}.recent time{font-size:13px;color:var(--muted)}footer{font-size:13px;color:var(--muted);margin-top:24px}.hint{font-size:13px;margin-bottom:0}
+@media(max-width:650px){main{padding:24px 16px}header{align-items:flex-start;flex-direction:column}.buttons{grid-template-columns:repeat(2,1fr)}.buttons .button-card:last-child{grid-column:1/-1}.totals{gap:8px}.total{padding:14px}.total strong{font-size:32px}.live{align-items:flex-start;flex-direction:column}.cooldown{text-align:left}td,th{padding:12px 5px}.panel{padding:18px}}
+</style>
+</head>
+<body><main>
+<header><div><div class="eyebrow">A moment to check in</div><h1>The Mood Switch</h1><p>Five ways to say how you feel.</p></div><div id="connection" class="status">Connecting…</div></header>
+<section class="live" aria-live="polite"><div><strong id="latest">Waiting for your first response</strong><p id="message">Press a physical button to record a response.</p></div><div id="cooldown" class="cooldown">Ready for a response</div></section>
+<section id="buttons" class="buttons" aria-label="Live physical buttons"></section>
+<p class="hint">Buttons light up on every press. Totals increase only when a response is saved.</p>
+<section class="totals"><div class="total"><span>Today</span><strong id="today">0</strong></div><div class="total"><span>This week</span><strong id="week">0</strong></div><div class="total"><span>All time</span><strong id="all">0</strong></div></section>
+<section class="panel"><h2>Responses by button</h2><table><thead><tr><th>Response</th><th>Today</th><th>This week</th><th>All time</th></tr></thead><tbody id="breakdown"></tbody></table></section>
+<section class="panel"><h2>Recent saved responses</h2><ul id="recent" class="recent"><li>No responses recorded yet.</li></ul></section>
+<footer id="footer">Stored locally on your Raspberry Pi.</footer>
+</main>
+<script>
+let sequence=null, built=false, labels={}, flashes={}, localZone='Europe/London';
+const el=id=>document.getElementById(id);
+function text(tag,value){const node=document.createElement(tag);node.textContent=value;return node;}
+function build(buttons){el('buttons').replaceChildren();el('breakdown').replaceChildren();for(const b of buttons){labels[b.id]=b.label;const card=document.createElement('div');card.className='button-card';card.id='card-'+b.id;const dot=document.createElement('div');dot.className='dot';card.append(dot,text('strong',b.label));const meaning=text('div',b.emotion||'');meaning.className='meaning';card.append(meaning,text('small','Released'));el('buttons').append(card);const row=document.createElement('tr');row.id='row-'+b.id;row.append(text('td',b.label),text('td','0'),text('td','0'),text('td','0'));el('breakdown').append(row);}built=true;}
+async function refresh(){try{const response=await fetch('/api/status',{cache:'no-store'});if(!response.ok)throw Error('Status unavailable');const d=await response.json();localZone=d.timezone;if(!built)build(d.buttons);const newest=d.transitions.length?d.transitions[d.transitions.length-1].sequence:0;if(sequence!==null){for(const t of d.transitions){if(t.sequence>sequence&&t.pressed)flashes[t.response]=Date.now()+900;}}sequence=newest;
+for(const b of d.buttons){const card=el('card-'+b.id),pressed=d.pressed[b.id];card.classList.toggle('active',pressed||Date.now()<(flashes[b.id]||0));card.querySelector('small').textContent=pressed?'Held down':'Released';const cells=el('row-'+b.id).children;['today','week','all'].forEach((key,i)=>cells[i+1].textContent=d.totals[key][b.id]||0);}
+for(const key of ['today','week','all'])el(key).textContent=Object.values(d.totals[key]).reduce((a,b)=>a+b,0);
+if(d.last_press){const p=d.last_press;el('latest').textContent=labels[p.response]||p.response;el('message').textContent=p.error?p.error:p.accepted?'Response saved on the Pi.':'Press detected · not saved during cooldown.';}else if(d.recent.length){el('latest').textContent=labels[d.recent[0].response]||d.recent[0].response;el('message').textContent='Latest saved response.';}
+el('cooldown').textContent=d.cooldown_remaining>0?'Ready in '+d.cooldown_remaining.toFixed(1)+' seconds':'Ready for a response';
+el('recent').replaceChildren();for(const event of d.recent){const li=document.createElement('li');li.append(text('span',labels[event.response]||event.response));const time=text('time',new Date(event.recorded_at).toLocaleString('en-GB',{timeZone:localZone,dateStyle:'medium',timeStyle:'medium'}));time.dateTime=event.recorded_at;li.append(time);el('recent').append(li);}if(!d.recent.length)el('recent').append(text('li','No responses recorded yet.'));
+el('connection').textContent='● Live · connected to Pi';el('connection').className='status';el('footer').textContent='Stored locally on your Raspberry Pi · '+localZone+' · weeks start Monday.';
+}catch(error){el('connection').textContent='Disconnected · retrying';el('connection').className='status offline';el('cooldown').textContent='Live status unavailable';for(const card of document.querySelectorAll('.button-card')){card.classList.remove('active');card.querySelector('small').textContent='Status unavailable';}}finally{setTimeout(refresh,200);}}
+refresh();
+</script></body></html>

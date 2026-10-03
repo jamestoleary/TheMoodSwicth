@@ -1,0 +1,13 @@
+[Unit]
+Description=The Mood Switch recorder and dashboard
+
+[Service]
+Type=simple
+WorkingDirectory=%h/TheMoodSwicth
+ExecStart=/usr/bin/python3 -u -m moodswitch.app
+Restart=on-failure
+RestartSec=3
+UMask=0077
+
+[Install]
+WantedBy=default.target

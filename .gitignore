@@ -1,7 +1,13 @@
 __pycache__/
+.DS_Store
 *.pyc
 *.db
 *.db-*
 .venv/
+.venv-sync/
+data/
+sync.json
+*service-account*.json
+my-project-1474626011708-b9251e2e8c83.json
 .env
 credentials*.json

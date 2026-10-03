@@ -1,0 +1,5 @@
+{
+  "spreadsheet_id": "REPLACE_WITH_YOUR_SPREADSHEET_ID",
+  "tab": "Events",
+  "credentials_file": "/home/admin/.config/moodswitch/google-service-account.json"
+}

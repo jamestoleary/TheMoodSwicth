@@ -99,6 +99,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=Path, default=ROOT / "config.json")
     parser.add_argument("--database", type=Path, default=ROOT / "data" / "events.db")
+    parser.add_argument("--host", default="127.0.0.1", help="Dashboard listen address")
     parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("--no-gpio", action="store_true", help="Dashboard preview without physical inputs")
     args = parser.parse_args()
@@ -127,10 +128,10 @@ def main():
                 # An already held input is visible but isn't counted as a new press.
                 with app.lock:
                     app.pressed[entry["id"]] = button.is_pressed
-        server = ThreadingHTTPServer(("127.0.0.1", args.port), handler_for(app))
+        server = ThreadingHTTPServer((args.host, args.port), handler_for(app))
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
-        LOG.info("Dashboard ready on http://127.0.0.1:%s", args.port)
+        LOG.info("Dashboard listening on %s:%s", args.host, args.port)
         stop.wait()
     finally:
         for button in buttons:

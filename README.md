@@ -16,10 +16,10 @@ Develop on the Mac, keep source code in GitHub, and run the device on the Pi.
 | Numbered WAV files on the Pi | `/home/admin/TheMoodSwicth/audio/` |
 | Persistent SQLite event database on the Pi | `/home/admin/TheMoodSwicth/data/events.db` |
 | Sync process lock on the Pi | `/home/admin/TheMoodSwicth/data/events.sync.lock` |
-| Private Google sync settings (not yet configured) | `/home/admin/.config/moodswitch/sync.json` |
-| Private Google key (not yet supplied) | `/home/admin/.config/moodswitch/google-service-account.json` |
+| Private Google sync settings | `/home/admin/.config/moodswitch/sync.json` |
+| Private Google key | `/home/admin/.config/moodswitch/google-service-account.json` |
 | Installed recorder service | `/home/admin/.config/systemd/user/moodswitch.service` |
-| Installed sync service and timer (inactive until configured) | `/home/admin/.config/systemd/user/moodswitch-sync.service` and `/home/admin/.config/systemd/user/moodswitch-sync.timer` |
+| Installed active sync service and timer | `/home/admin/.config/systemd/user/moodswitch-sync.service` and `/home/admin/.config/systemd/user/moodswitch-sync.timer` |
 | Separate sync dependency environment | `/home/admin/TheMoodSwicth/.venv-sync/` |
 
 Changes are currently written to the **Mac checkout**, then copied over SSH to
@@ -31,20 +31,20 @@ SQLite stores each accepted response on the Pi's SD card and commits it before
 audio is queued. The file persists across application restarts and normal Pi
 shutdowns. A failed save produces no confirmation sound. Clean shutdown is
 recommended; abruptly removing power can interrupt writes or damage the SD
-card/filesystem. No external backup is active until Google sync is configured.
+card/filesystem. Google Sheets now receives periodic copies of accepted responses.
 Application logs are in the systemd user journal, separate from the event database.
 
 ### Configuration and secrets
 
 No `.env` file is needed or read by the app. `config.json` holds ordinary
 settings and can be committed. `sync.example.json` is a safe template; the real
-sync settings and Google key will live under `/home/admin/.config/moodswitch/`,
+sync settings and Google key live under `/home/admin/.config/moodswitch/`,
 outside the deployed repository folder. Protect the directory with mode 700
 and the files with mode 600. Never commit passwords or private keys.
 At the user's request, the downloaded JSON key remains in the Mac checkout.
 Its exact filename is excluded by `.gitignore` and was verified as untracked.
 If the filename changes, update the ignore rule and check Git before committing.
-The Pi key transfer awaits explicit approval; it has not occurred yet.
+The key was copied to the Pi's private folder with explicit user approval.
 The ignore rules also exclude `.env`, local databases, dependency environments,
 `sync.json`, and service-account key filenames as a secondary safeguard.
 
@@ -57,6 +57,7 @@ the Pi's event database and dependency environments:
 rsync -av --exclude='.git/' --exclude='data/' --exclude='.venv/' \
   --exclude='.venv-sync/' --exclude='__pycache__/' --exclude='.env' \
   --exclude='sync.json' --exclude='*service-account*.json' \
+  --exclude='my-project-1474626011708-b9251e2e8c83.json' \
   --exclude='credentials*.json' --exclude='*.db' --exclude='*.db-*' \
   ./ admin@192.168.1.20:/home/admin/TheMoodSwicth/
 ssh admin@192.168.1.20 'systemctl --user restart moodswitch.service'
@@ -154,15 +155,18 @@ speaker's volume. Set `audio_device` to `null` to use the system default output.
 New files are discovered on the next accepted press **after copying them to
 the Pi's audio folder**; adding a file on the Mac alone does not transfer it.
 
-## Google Sheets sync — awaiting credentials
+## Google Sheets sync — active
 
-The sync component and five-minute timer are implemented but **not enabled**.
-The recorder continues saving locally without them. Google access must be
-configured on the Pi separately from Codex's connected Google Drive account.
+The sync component and five-minute timer are installed and **enabled**.
+The recorder continues saving locally even when the internet is unavailable.
+The Pi authenticates using its private service-account key, independently of
+Codex's connected Google Drive account.
 
 Destination created: [The Mood Switch — Responses](https://docs.google.com/spreadsheets/d/1OPq9tW2RNDyu51vSitHyD2VlNLOL5filDnP1XLw0EUI/edit),
-with an `Events` tab. Sharing with the Pi's service account and copying its key
-remain pending approval.
+with an `Events` tab. The Pi's service account has Editor access to this sheet.
+The first live upload synced 15 responses; a second run reported zero new
+events, confirming that it did not upload them again. Local database integrity
+and synced counts were checked after the upload.
 
 Use a dedicated spreadsheet with a tab named `Events`. Its header row must be:
 
@@ -226,16 +230,20 @@ independently while sync runs or Wi-Fi is unavailable.
 
 ## Open the live dashboard
 
-The app listens on the Pi's loopback address, keeping the dashboard local.
-On the Mac, keep an SSH tunnel open:
+The installed Pi service listens on its network interfaces and starts automatically
+at boot. On a device on the same local network, open:
 
-```sh
-ssh -N -L 127.0.0.1:8080:127.0.0.1:8080 admin@192.168.1.20
-```
+- [The Mood Switch by local name](http://alivetracker.local:8080/)
+- [The Mood Switch by current IP address](http://192.168.1.20:8080/)
 
-Then open [the dashboard](http://127.0.0.1:8080) on the Mac. An active tunnel is
-required. If local port 8080 is already in use, use 8081 before the first colon
-and open port 8081 instead. The dashboard refreshes approximately five times
+No Mac SSH tunnel is required. The local name uses mDNS (Avahi on the Pi);
+if your device cannot resolve it, use the IP address. The router may change
+the IP address, so reserve it for the Pi in the router's DHCP settings if you
+want that address to stay fixed. The dashboard has no login: devices on your
+local network can read it. Do not forward this port through your router.
+
+Manual app launches default to loopback; use `--host 0.0.0.0` for LAN access.
+The dashboard refreshes approximately five times
 per second and preserves brief press flashes between updates. A held button
 lights up, while a press during cooldown is displayed but not saved or counted.
 Statistics use Europe/London dates; weeks start on Monday.
@@ -311,16 +319,17 @@ python3 -m unittest discover -s tests -v
 1. Hardware milestone complete: all five buttons verified with stable holds.
 2. Implemented: GPIO events feed SQLite. An accepted press saves one response;
    presses during the shared five-second cooldown save nothing. Live hardware
-   validation of this combined app is the next check.
+   validation of the combined app passed through user button presses.
 3. Implemented: response-specific numbered WAVs play only after a successful
-   save. Ignored presses produce no sound. Audible speaker validation is pending.
+   save. Ignored presses produce no sound. The user confirmed audible playback.
 4. Implemented: locally hosted live dashboard with recent responses and button
    totals for today, this week, and all time, using Europe/London boundaries.
 5. Installed: systemd user service for startup and recovery after crashes.
    A full reboot check is still pending.
 6. Implemented and tested: Google Sheets sync with event-ID reconciliation and
-   offline retry. Credentials, destination, live upload validation, and timer
-   activation are still pending. SQLite remains authoritative offline.
+   offline retry. Credentials, destination, and live upload are validated; the
+   five-minute timer is active. SQLite remains authoritative offline.
 7. Add separate weekly reporting once storage and sync are reliable.
 
-Google Sheets destination and Pi authentication remain to be configured.
+Google Sheets destination and Pi authentication are configured. Weekly reporting
+and a full power-cycle verification remain future work.

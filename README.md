@@ -1,31 +1,39 @@
 # TheMoodSwicth
 
 A Raspberry Pi device with five physical buttons for recording emotional states.
-Develop on the Mac, keep source code in GitHub, and run the device on the Pi.
+Develop on your computer, keep source code in GitHub, and run the device on the Pi.
+Built with assistance from Codex.
 
 ## Where the code and data live
 
-| Purpose | Exact location |
-| --- | --- |
-| Source checkout on the Mac (edit here in VS Code) | `/Users/spark/Documents/Codex/TheMoodSwicth/` |
-| GitHub remote | `https://github.com/jamestoleary/TheMoodSwicth.git` |
-| Deployed application folder on the Pi | `/home/admin/TheMoodSwicth/` |
-| Python application code on the Pi | `/home/admin/TheMoodSwicth/moodswitch/` |
-| Dashboard page on the Pi | `/home/admin/TheMoodSwicth/moodswitch/dashboard.html` |
-| Ordinary button/audio settings on the Pi | `/home/admin/TheMoodSwicth/config.json` |
-| Numbered WAV files on the Pi | `/home/admin/TheMoodSwicth/audio/` |
-| Persistent SQLite event database on the Pi | `/home/admin/TheMoodSwicth/data/events.db` |
-| Sync process lock on the Pi | `/home/admin/TheMoodSwicth/data/events.sync.lock` |
-| Private Google sync settings | `/home/admin/.config/moodswitch/sync.json` |
-| Private Google key | `/home/admin/.config/moodswitch/google-service-account.json` |
-| Installed recorder service | `/home/admin/.config/systemd/user/moodswitch.service` |
-| Installed active sync service and timer | `/home/admin/.config/systemd/user/moodswitch-sync.service` and `/home/admin/.config/systemd/user/moodswitch-sync.timer` |
-| Separate sync dependency environment | `/home/admin/TheMoodSwicth/.venv-sync/` |
+Choose a source folder on your computer, such as `~/Documents/TheMoodSwicth`.
+The examples below deploy to `~/TheMoodSwicth` on the Pi. `~` means the home
+directory of the user on the machine where the command runs. Replace
+`<pi-user>` and `<pi-host>` with your Pi login and hostname or IP address.
+The bundled service files expect the Pi app at `~/TheMoodSwicth`; edit their
+paths if you choose a different location.
 
-Changes are currently written to the **Mac checkout**, then copied over SSH to
-the Pi's deployed application folder. The Pi folder is a deployment copy, not
-a Git clone. Edits and new audio added on the Mac aren't automatically copied
-to the Pi or pushed to GitHub. GitHub commits and pushes are separate steps.
+| Purpose | Example location |
+| --- | --- |
+| Source checkout on your computer (edit here) | `~/Documents/TheMoodSwicth/` |
+| GitHub remote | `https://github.com/jamestoleary/TheMoodSwicth.git` |
+| Deployed application folder on the Pi | `~/TheMoodSwicth/` |
+| Python application code on the Pi | `~/TheMoodSwicth/moodswitch/` |
+| Dashboard page on the Pi | `~/TheMoodSwicth/moodswitch/dashboard.html` |
+| Ordinary button/audio settings on the Pi | `~/TheMoodSwicth/config.json` |
+| Numbered WAV files on the Pi | `~/TheMoodSwicth/audio/` |
+| Persistent SQLite event database on the Pi | `~/TheMoodSwicth/data/events.db` |
+| Sync process lock on the Pi | `~/TheMoodSwicth/data/events.sync.lock` |
+| Private Google sync settings | `~/.config/moodswitch/sync.json` |
+| Private Google key | `~/.config/moodswitch/google-service-account.json` |
+| Installed recorder service | `~/.config/systemd/user/moodswitch.service` |
+| Installed active sync service and timer | `~/.config/systemd/user/moodswitch-sync.service` and `~/.config/systemd/user/moodswitch-sync.timer` |
+| Separate sync dependency environment | `~/TheMoodSwicth/.venv-sync/` |
+
+Edit your **local checkout**, then copy changes over SSH to the Pi's
+deployed application folder. With the copy workflow below, the Pi folder is a
+deployment copy rather than a Git clone. Local edits and new audio are not
+automatically copied to the Pi or pushed to GitHub. GitHub commits and pushes are separate steps.
 
 SQLite stores each accepted response on the Pi's SD card and commits it before
 audio is queued. The file persists across application restarts and normal Pi
@@ -38,44 +46,46 @@ Application logs are in the systemd user journal, separate from the event databa
 
 No `.env` file is needed or read by the app. `config.json` holds ordinary
 settings and can be committed. `sync.example.json` is a safe template; the real
-sync settings and Google key live under `/home/admin/.config/moodswitch/`,
+sync settings and Google key live under `~/.config/moodswitch/`,
 outside the deployed repository folder. Protect the directory with mode 700
 and the files with mode 600. Never commit passwords or private keys.
-At the user's request, the downloaded JSON key remains in the Mac checkout.
-Its exact filename is excluded by `.gitignore` and was verified as untracked.
-If the filename changes, update the ignore rule and check Git before committing.
-The key was copied to the Pi's private folder with explicit user approval.
+Keep downloaded keys outside your source checkout where possible. If you keep
+a key inside the checkout, add its filename to a local Git exclusion before
+committing and verify it with `git check-ignore <key-file>` and
+`git ls-files -- <key-file>` (the latter must return no tracked file).
+Never include real credential filenames or contents in public documentation.
 The ignore rules also exclude `.env`, local databases, dependency environments,
 `sync.json`, and service-account key filenames as a secondary safeguard.
 
-### Copy subsequent changes from the Mac
+### Copy subsequent changes from your computer
 
-From the Mac checkout directory, this copies code and audio while preserving
+From your local checkout directory, this copies code and audio while preserving
 the Pi's event database and dependency environments:
 
 ```sh
 rsync -av --exclude='.git/' --exclude='data/' --exclude='.venv/' \
   --exclude='.venv-sync/' --exclude='__pycache__/' --exclude='.env' \
   --exclude='sync.json' --exclude='*service-account*.json' \
-  --exclude='my-project-1474626011708-b9251e2e8c83.json' \
+  --exclude='<your-key-filename>.json' \
   --exclude='credentials*.json' --exclude='*.db' --exclude='*.db-*' \
-  ./ admin@192.168.1.20:/home/admin/TheMoodSwicth/
-ssh admin@192.168.1.20 'systemctl --user restart moodswitch.service'
+  ./ "<pi-user>@<pi-host>:~/TheMoodSwicth/"
+ssh "<pi-user>@<pi-host>" 'systemctl --user restart moodswitch.service'
 ```
 
-The sync credentials remain outside that copy. There is no `--delete`, so this
+Replace the key-file exclusion with your actual filename, or remove that line
+if your key is outside the checkout. The sync credentials remain outside that copy. There is no `--delete`, so this
 does not remove existing Pi files. When replacing a numbered audio file, avoid
 leaving two WAVs with the same leading number in the Pi's audio folder.
 
 ## Hardware and connection
 
-- Verified device: Raspberry Pi 3 Model B Rev 1.2, hostname `alivetracker`.
-- Observed operating system: Debian 13 (Trixie).
-- SSH is enabled. Login username: `admin`.
-- Last observed local address: `192.168.1.20` (may change with DHCP).
+- Tested hardware: Raspberry Pi 3 Model B Rev 1.2, with a 40-pin GPIO header.
+- Tested operating system: Debian 13 (Trixie).
+- Enable SSH and Wi-Fi during operating-system setup. Choose your own username
+  and hostname; use those values in the connection examples.
 - Passwords and Google credentials must never be committed to this repository.
 
-Connect from your Mac terminal using `ssh admin@192.168.1.20`.
+Connect from your computer's terminal using `ssh "<pi-user>@<pi-host>"`.
 Enter the password when prompted. Confirm a new host key against the Pi before
 accepting it. To shut down cleanly, run `sudo shutdown -h now` on the Pi, wait
 for shutdown to finish, and disconnect its power before changing wiring.
@@ -130,9 +140,9 @@ Button numbers identify categories and their audio files; do not average them
 or interpret 1–5 as a severity scale. Labels and meanings can be changed in
 configuration without changing existing stored button IDs.
 
-The app is deployed to `/home/admin/TheMoodSwicth` on the Pi and runs as the
+The app is deployed to `~/TheMoodSwicth` on the Pi and runs as the
 `moodswitch.service` user service. Numbered WAV playback is implemented; cloud
-sync remains planned. The wiring diagnostic is separate and must not run
+Google Sheets sync is implemented. The wiring diagnostic is separate and must not run
 alongside the app.
 
 ## Audio files
@@ -153,20 +163,17 @@ The configured device `plughw:CARD=Headphones,DEV=0` routes through the Pi's
 3.5 mm jack using `aplay`. Connect that jack to a powered speaker and check the
 speaker's volume. Set `audio_device` to `null` to use the system default output.
 New files are discovered on the next accepted press **after copying them to
-the Pi's audio folder**; adding a file on the Mac alone does not transfer it.
+the Pi's audio folder**; adding a file on your computer alone does not transfer it.
 
-## Google Sheets sync — active
+## Google Sheets sync
 
-The sync component and five-minute timer are installed and **enabled**.
-The recorder continues saving locally even when the internet is unavailable.
-The Pi authenticates using its private service-account key, independently of
-Codex's connected Google Drive account.
+The optional sync component uploads accepted responses every five minutes
+when its timer is configured and enabled. The recorder continues saving
+locally when the internet is unavailable. The Pi authenticates using a private
+service-account key; it does not need a connected Codex Google Drive account.
 
-Destination created: [The Mood Switch — Responses](https://docs.google.com/spreadsheets/d/1OPq9tW2RNDyu51vSitHyD2VlNLOL5filDnP1XLw0EUI/edit),
-with an `Events` tab. The Pi's service account has Editor access to this sheet.
-The first live upload synced 15 responses; a second run reported zero new
-events, confirming that it did not upload them again. Local database integrity
-and synced counts were checked after the upload.
+Create your own destination spreadsheet and configure its ID using the setup
+below. Do not publish your private spreadsheet link or service-account details.
 
 Use a dedicated spreadsheet with a tab named `Events`. Its header row must be:
 
@@ -194,8 +201,8 @@ someone later deletes its Google Sheets row.
 3. Create and download its JSON key, keep it private, and share only the target
    spreadsheet with the service account email as Editor.
 4. Store the key on the Pi at
-   `/home/admin/.config/moodswitch/google-service-account.json`, outside Git.
-5. Copy `sync.example.json` to `/home/admin/.config/moodswitch/sync.json`, replace
+   `~/.config/moodswitch/google-service-account.json`, outside Git.
+5. Copy `sync.example.json` to `~/.config/moodswitch/sync.json`, replace
    the spreadsheet ID, and keep the `Events` tab name or set the exact chosen tab.
 6. Protect that directory and both files with permissions 700 and 600 respectively.
 
@@ -233,14 +240,24 @@ independently while sync runs or Wi-Fi is unavailable.
 The installed Pi service listens on its network interfaces and starts automatically
 at boot. On a device on the same local network, open:
 
-- [The Mood Switch by local name](http://alivetracker.local:8080/)
-- [The Mood Switch by current IP address](http://192.168.1.20:8080/)
+- Local hostname: `http://<pi-hostname>.local:8080/`
+- IP address: `http://<pi-ip-address>:8080/`
 
-No Mac SSH tunnel is required. The local name uses mDNS (Avahi on the Pi);
+Replace the placeholders with the hostname or current address of your Pi.
+
+No SSH tunnel is required. The name before `.local` is the Pi’s configured hostname, not its login
+username or the project name. For example, a Pi named `mood-switch` is
+available at `http://mood-switch.local:8080/`. Check its hostname by running
+`hostname` on the Pi. The service uses port `8080` by default and starts at
+boot after the user service is enabled and lingering is configured below.
+Give the Pi a unique hostname on your network to avoid name conflicts.
+The local name uses mDNS (Avahi on the Pi);
 if your device cannot resolve it, use the IP address. The router may change
 the IP address, so reserve it for the Pi in the router's DHCP settings if you
 want that address to stay fixed. The dashboard has no login: devices on your
 local network can read it. Do not forward this port through your router.
+
+Reference: [Raspberry Pi local hostname documentation](https://www.raspberrypi.com/documentation/computers/remote-access.html).
 
 Manual app launches default to loopback; use `--host 0.0.0.0` for LAN access.
 The dashboard refreshes approximately five times
@@ -264,7 +281,7 @@ mkdir -p ~/.config/systemd/user
 cp moodswitch.service ~/.config/systemd/user/
 systemctl --user daemon-reload
 systemctl --user enable --now moodswitch.service
-sudo loginctl enable-linger admin
+sudo loginctl enable-linger "$USER"
 ```
 
 Lingering lets the user service run at boot without an interactive login.
@@ -279,7 +296,7 @@ After updating code or configuration, run
 `systemctl --user restart moodswitch.service`. Stop the service with
 `systemctl --user stop moodswitch.service` before running `button_test.py`,
 then start it again with `systemctl --user start moodswitch.service` afterwards.
-On the Mac, a dashboard-only preview is available using
+On your development computer, a dashboard-only preview is available using
 `python3 -m moodswitch.app --no-gpio`; it does not receive physical presses.
 
 ## Run the wiring test
@@ -290,14 +307,14 @@ On the Pi, from the repository directory:
 python3 button_test.py
 ```
 
-The Pi already has gpiozero available. Wait for the readiness message, then
+Install gpiozero on the Pi if it is not already available. Wait for the readiness message, then
 press and release one physical button at a time. Match the displayed number
 to the table. Stop with Ctrl+C. If a held button produces repeated transitions,
 check the switch contacts and wiring before relying on logged responses.
 
 ## Run software tests
 
-From the repository directory on the Mac or Pi:
+From the repository directory on your computer or Pi:
 
 ```sh
 python3 -m unittest discover -s tests -v
@@ -325,11 +342,11 @@ python3 -m unittest discover -s tests -v
 4. Implemented: locally hosted live dashboard with recent responses and button
    totals for today, this week, and all time, using Europe/London boundaries.
 5. Installed: systemd user service for startup and recovery after crashes.
-   A full reboot check is still pending.
+   Automatic startup was verified after a power cycle on the development device.
 6. Implemented and tested: Google Sheets sync with event-ID reconciliation and
    offline retry. Credentials, destination, and live upload are validated; the
    five-minute timer is active. SQLite remains authoritative offline.
 7. Add separate weekly reporting once storage and sync are reliable.
 
-Google Sheets destination and Pi authentication are configured. Weekly reporting
-and a full power-cycle verification remain future work.
+Configure your own Google Sheets destination and Pi authentication before
+enabling sync. Separate weekly reporting remains future work.
